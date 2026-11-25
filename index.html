@@ -6167,16 +6167,16 @@
             <div class="tags">
               <span class="tag tag-cat">${book.category}</span>
               <span class="tag tag-type">${book.purpose}</span>
-              ${isOwner ? `<span class="tag tag-mine">My Book</span>` : ""}
+              ${isOwner ? `<span class="tag tag-mine">Your Listing</span>` : ""}
             </div>
             <div class="book-title">${book.title}</div>
-            <div class="author-price-row" onclick="event.stopPropagation()">
+            <div class="author-price-row">
               <div class="book-author">✍️ ${book.author}</div>
               ${rightOfAuthorHtml}
             </div>
             <div class="meta">
               <span>📍 ${book.location}</span>
-              <button type="button" class="owner-link-btn" title="View ${book.ownerName}'s profile" onclick="handleCardOwnerClick(${idx}, event)">👤 ${book.ownerName}${ownerLocked ? " 🔒" : ""}</button>
+              <button type="button" class="owner-link-btn" title="View owner's profile" onclick="handleCardOwnerClick(${idx}, event)">👤 ${book.ownerName}${ownerLocked ? " 🔒" : ""}</button>
             </div>
           </div>
         `;
@@ -6185,60 +6185,72 @@
     }
 
     function populateDetailModal(book) {
-      const formattedPrice = isSellingPurpose(book.purpose) ? formatPriceRs(book.price) : "";
+      const isOwner = isBookOwner(book);
+      const isSelling = isSellingPurpose(book.purpose);
+      const formattedPrice = isSelling ? formatPriceRs(book.price) : "";
+      const waVisible = isBookWhatsappVisible(book);
       const ownerKey = resolveUserKey(book.ownerEmail, book.ownerName);
       const ownerLocked = isProfileLocked(ownerKey, book.ownerName);
 
       document.getElementById("mBookId").textContent = `ID: ${book.id}`;
       const imgEl = document.getElementById("mImage");
       imgEl.src = book.image || DEFAULT_COVER;
-      imgEl.onerror = () => { imgEl.src = DEFAULT_COVER; };
+      imgEl.onerror = () => {
+        imgEl.src = DEFAULT_COVER;
+      };
 
       document.getElementById("mCategory").textContent = book.category;
       document.getElementById("mType").textContent = book.purpose;
-
-      const priceRow = document.getElementById("mSpecPriceRow");
-      const priceSpecVal = document.getElementById("mSpecPrice");
-      if (formattedPrice) {
-        priceSpecVal.textContent = formattedPrice;
-        priceRow.style.display = "flex";
-      } else {
-        priceRow.style.display = "none";
-      }
-
       document.getElementById("mTitle").textContent = book.title;
-      syncDetailCartButton(book);
-      document.getElementById("mAuthor").textContent = `✍️ Author: ${book.author}`;
+      document.getElementById("mAuthor").textContent = `✍️ ${book.author}`;
 
       document.getElementById("mSpecCat").textContent = book.category;
       document.getElementById("mSpecType").textContent = book.purpose;
+
+      const priceRow = document.getElementById("mSpecPriceRow");
+      const priceVal = document.getElementById("mSpecPrice");
+      if (isSelling && formattedPrice) {
+        priceRow.style.display = "flex";
+        priceVal.textContent = formattedPrice;
+      } else {
+        priceRow.style.display = "none";
+        priceVal.textContent = "-";
+      }
+
       document.getElementById("mSpecStatus").textContent = book.statusRaw;
       document.getElementById("mSpecCity").textContent = book.location;
 
-      document.getElementById("mOwner").textContent = `👤 ${book.ownerName}${ownerLocked ? " 🔒" : ""} (View Profile)`;
+      document.getElementById("mOwner").textContent = `👤 ${book.ownerName}${ownerLocked ? " 🔒" : ""}`;
       document.getElementById("mLocationSub").textContent = `📍 ${book.location}`;
 
-      document.getElementById("mMessageBtn").style.display = "block";
+      syncDetailCartButton(book);
+
+      const msgBtn = document.getElementById("mMessageBtn");
+      msgBtn.style.display = isOwner ? "none" : "block";
 
       const waBtn = document.getElementById("mWaBtn");
-      waBtn.style.display = isBookWhatsappVisible(book) ? "block" : "none";
+      if (book.whatsapp && waVisible) {
+        waBtn.style.display = "block";
+        waBtn.textContent = `💬 WhatsApp (${book.rawWhatsapp || book.whatsapp})`;
+      } else {
+        waBtn.style.display = "none";
+      }
 
       const ownerActions = document.getElementById("ownerModalActions");
-      ownerActions.style.display = isBookOwner(book) ? "grid" : "none";
+      ownerActions.style.display = isOwner ? "grid" : "none";
 
       document.getElementById("detailModal").classList.add("open");
       document.body.style.overflow = "hidden";
     }
 
-    function openDetailModal(index) {
-      const book = visibleBooks[index];
+    function openDetailModal(idx) {
+      const book = visibleBooks[idx];
       if (!book) return;
       currentDetailBook = book;
       populateDetailModal(book);
     }
 
     function openCartModal() {
-      if (!requireAuth("signin", "Please sign in or sign up to view your cart.")) return;
       renderCartModal();
       document.getElementById("cartModal").classList.add("open");
       document.body.style.overflow = "hidden";
@@ -6246,19 +6258,19 @@
 
     function renderCartModal() {
       const body = document.getElementById("cartBody");
-      const cartBooks = allBooks.filter(b => cart.includes(b._key));
+      const cartBooks = isLoggedIn() ? allBooks.filter(b => cart.includes(b._key)) : [];
 
       if (!cartBooks.length) {
-        body.innerHTML = `<p style="text-align:center;color:var(--muted);padding:20px 0;">Your cart is empty. Click "+ Cart" on any book to add it here.</p>`;
+        body.innerHTML = `<div class="status-msg" style="padding:24px 10px;"><span>Your cart is currently empty.</span></div>`;
         return;
       }
 
       body.innerHTML = cartBooks.map(b => {
-        const pText = isSellingPurpose(b.purpose) && formatPriceRs(b.price) ? ` • ${formatPriceRs(b.price)}` : "";
+        const pStr = isSellingPurpose(b.purpose) && formatPriceRs(b.price) ? ` • <strong>${formatPriceRs(b.price)}</strong>` : "";
         return `
           <div class="cart-item">
             <div>
-              <div class="cart-item-title">${b.title}${pText}</div>
+              <div class="cart-item-title">${b.title} (${b.purpose}${pStr})</div>
               <div class="cart-item-sub">👤 ${b.ownerName} • 📍 ${b.location}</div>
             </div>
             <button class="remove-btn" onclick="toggleCart('${b._key}')">Remove</button>
@@ -6268,23 +6280,20 @@
     }
 
     function closeModal(id) {
-      if (id === "chatModal") closeChatOptionsMenu();
       document.getElementById(id).classList.remove("open");
-      if (id === "profileModal") {
-        profileModalViewMode = "profile";
-        isEditingBio = false;
-        document.getElementById("profileBackBtn").textContent = "← Close";
-      }
-      if (!document.querySelector(".modal-overlay.open")) {
+      const anyOpen = document.querySelector(".modal-overlay.open");
+      if (!anyOpen) {
         document.body.style.overflow = "";
       }
     }
 
-    function closeModalOnBackdrop(e, id) {
-      if (e.target.id === id) {
-        if (id === "chatModal") closeChatModal();
-        else if (id === "avatarCropModal") cancelAvatarCrop();
-        else closeModal(id);
+    function closeModalOnBackdrop(event, id) {
+      if (event.target.id === id) {
+        if (id === "chatModal") {
+          closeChatModal();
+        } else {
+          closeModal(id);
+        }
       }
     }
 
@@ -6292,6 +6301,7 @@
       closeChatOptionsMenu();
     });
 
+    document.getElementById("searchInput").addEventListener("input", renderBooks);
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         if (document.getElementById("photoLightboxModal").classList.contains("open")) {
@@ -6302,23 +6312,29 @@
           cancelAvatarCrop();
           return;
         }
-        closeChatModal();
-        ["detailModal", "cartModal", "authModal", "bookFormModal", "profileModal", "swapModal", "editProfileModal"].forEach(closeModal);
+        closeChatOptionsMenu();
+        document.querySelectorAll(".modal-overlay.open").forEach(m => {
+          if (m.id === "chatModal") {
+            closeChatModal();
+          } else {
+            m.classList.remove("open");
+          }
+        });
+        document.body.style.overflow = "";
       }
     });
 
-    const script = document.createElement("script");
-    script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:handleSheetData&sheet=${encodeURIComponent(SHEET_NAME)}`;
-    script.onerror = function () {
-      document.getElementById("statusMsg").innerHTML =
-        `<span>Unable to load book listings. Please check your connection.</span>`;
-    };
-    document.body.appendChild(script);
-
-    document.getElementById("searchInput").addEventListener("input", renderBooks);
     updateAuthUI();
-    updateBadges();
-    if (!isLoggedIn()) openAuthModal("signin");
+
+    (function loadSheet() {
+      const script = document.createElement("script");
+      script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=responseHandler:handleSheetData&t=${Date.now()}`;
+      script.onerror = () => {
+        document.getElementById("statusMsg").innerHTML =
+          `<span>Unable to load book data from Google Sheets. Please check sheet sharing permissions.</span>`;
+      };
+      document.body.appendChild(script);
+    })();
   </script>
 </body>
 </html>
