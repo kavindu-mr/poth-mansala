@@ -2861,7 +2861,7 @@
   <script>
     const SHEET_ID = "11tDsJq4NusJAjgAZszlHKoKP19UbmyCCMrHfCA-3vIg";
     const SHEET_NAME = "Book";
-    const USER_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyoYj-OEJQrb4ss3KMTKptQSEL0NN324bunWsfHa2VxGl_teo6Kzfmlb8xJtuGt9Ziq/exec";
+    const USER_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYPVMYFw5YbEFDfag_2vGnDJw_PHb9PIu93FeLpTpHH8inY6kMh0vGm85BmIE1aXS8/exec";
     const DEFAULT_COVER = "https://placehold.co/600x360/e2e8f0/475569?text=No+Cover+Image";
     const ALLOWED_CATEGORIES = ["Novels", "Short Stories", "Academic", "Other"];
     const IG_BIO_MAX_CHARS = 150;
@@ -3253,7 +3253,7 @@
 
       const email = normalizeEmail(currentUser.email);
       const name = document.getElementById("epName").value.trim();
-      const newPassword = document.getElementById("epPassword").value;
+      const newPassword = document.getElementById("epPassword").value.trim();
       const whatsapp = document.getElementById("epWhatsapp").value.trim();
       const district = document.getElementById("epDistrict").value.trim();
       const city = document.getElementById("epCity").value.trim();
@@ -3370,7 +3370,7 @@
       const prev = authCredentialsMap[normEmail];
       const prevObj = (prev && typeof prev === "object") ? prev : { password: String(prev || ""), name: "" };
       authCredentialsMap[normEmail] = {
-        password: String(password),
+        password: String(password).trim(),
         name: String(name || prevObj.name || "").trim()
       };
       localStorage.setItem("pm_auth_creds_v1", JSON.stringify(authCredentialsMap));
@@ -5237,7 +5237,7 @@
         return serverPasswordValid;
       }
       const expectedFromServer = serverUserObj && serverUserObj.password !== undefined && serverUserObj.password !== null
-        ? String(serverUserObj.password)
+        ? String(serverUserObj.password).trim()
         : "";
       const expectedFromLocal = getStoredCredentialPassword(email);
 
@@ -5247,14 +5247,14 @@
       if (expectedFromLocal) {
         return enteredPassword === expectedFromLocal;
       }
-      return true;
+      return false;
     }
 
     async function submitSignIn(e) {
       e.preventDefault();
       const identifier = document.getElementById("siIdentifier").value.trim();
       const email = resolveEmailFromIdentifier(identifier);
-      const password = document.getElementById("siPassword").value;
+      const password = document.getElementById("siPassword").value.trim();
       const btn = document.getElementById("signInBtn");
       const fb = document.getElementById("signInFeedback");
       const alertBox = document.getElementById("authAlertBox");
@@ -5273,10 +5273,9 @@
         if (localEntry && localEntry.password && localEntry.password !== password) {
           return { status: "wrong_password" };
         }
-        if (localEntry || backup.email || normEm.includes("@")) {
-          const resolvedEm = (localEntry && localEntry.email) || backup.email || normEm;
-          const resolvedNm = (localEntry && localEntry.name) || backup.name || (!identifier.includes("@") ? identifier : resolvedEm.split("@")[0]);
-          saveCredentialRecord(resolvedEm, password, resolvedNm);
+        if (localEntry && localEntry.password === password) {
+          const resolvedEm = localEntry.email || backup.email || normEm;
+          const resolvedNm = localEntry.name || backup.name || (!identifier.includes("@") ? identifier : resolvedEm.split("@")[0]);
           completeSignInSession({
             email: resolvedEm,
             name: resolvedNm,
@@ -5293,7 +5292,14 @@
 
       function handleServerResponse(res) {
         if (!res) return false;
-        if (res.found && res.user) {
+        if (res.found) {
+          if (res.passwordValid === false || !res.user) {
+            btn.disabled = false;
+            btn.textContent = "Sign In";
+            fb.style.color = "#e11d48";
+            fb.textContent = "Incorrect email/name or password.";
+            return true;
+          }
           if (!verifyPasswordForSignIn(res.user.email || email, password, res.user, res.passwordValid)) {
             btn.disabled = false;
             btn.textContent = "Sign In";
@@ -5461,7 +5467,7 @@
       const alertBox = document.getElementById("authAlertBox");
 
       const email = document.getElementById("suEmail").value.trim().toLowerCase();
-      const password = document.getElementById("suPassword").value;
+      const password = document.getElementById("suPassword").value.trim();
       const name = document.getElementById("suName").value.trim();
 
       if (password.length !== REQUIRED_PASSWORD_LENGTH) {
